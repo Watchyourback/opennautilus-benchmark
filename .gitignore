@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.log
+.venv/
+tmp/
+results/*.json
+!results/.gitkeep

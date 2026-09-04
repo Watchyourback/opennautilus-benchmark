@@ -1,0 +1,9 @@
+name: nautilus-benchmark
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12.13
+  - pip=26.2.1
+  - packaging=26.3
+  - setuptools=84.0.0
+  - wheel=0.48.0

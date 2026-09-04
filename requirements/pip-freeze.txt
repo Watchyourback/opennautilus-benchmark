@@ -1,0 +1,4 @@
+nautilus-trader==2.0.0rc3.dev20260811
+packaging==26.3
+setuptools==84.0.0
+wheel==0.48.0
