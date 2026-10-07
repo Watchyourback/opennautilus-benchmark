@@ -5,10 +5,12 @@ set -euo pipefail
 PROJECT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 ENV_NAME=nautilus-benchmark
 PYTHON_VERSION=3.12.13
-NAUTILUS_VERSION=2.0.0rc3.dev20260811
+NAUTILUS_VERSION=2.0.0rc6
 DATA_FILE="$PROJECT_DIR/data/btc-perp-20211231-20220201_1m.csv"
 DATA_SHA256=65ab55cd5f3531aa64f429772a38331fe82a92973cbb32a79b243073236c8da3
 PACKAGE_INDEX=https://packages.nautechsystems.io/simple
+WHEEL_URL="https://github.com/nautechsystems/nautilus_trader/releases/download/v$NAUTILUS_VERSION/nautilus_trader-$NAUTILUS_VERSION-cp312-cp312-manylinux_2_34_x86_64.whl"
+WHEEL_SHA256=9b4002a7bf5e6399c51073039b740ccf3ca7a1e2584ff72c7d479f03eaa9658d
 MINIFORGE_VERSION=26.7.2-0
 MINIFORGE_SHA256=281b0ac7d550802efc81af633225a5e6116d29ae72f3ab4eae7168c3931a4c05
 CONDA_BIN=
@@ -102,12 +104,12 @@ if actual_python != expected_python:
 print(f'[阶段 2/4 完成] Python 版本正确：{actual_python}')
 "
 
-    printf '[阶段 3/4] 正在从 NautilusTrader 官方 nightly index 安装/核验固定 wheel...\n'
+    printf '[阶段 3/4] 正在安装/核验 NautilusTrader %s 官方 release wheel（含 SHA256 校验）...\n' "$NAUTILUS_VERSION"
     "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" python -m pip install \
         --disable-pip-version-check \
         --only-binary=:all: \
         --index-url "$PACKAGE_INDEX" \
-        "nautilus_trader==$NAUTILUS_VERSION"
+        "nautilus_trader @ $WHEEL_URL#sha256=$WHEEL_SHA256"
 
     "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" python -c "
 import nautilus_trader

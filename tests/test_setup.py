@@ -2,6 +2,7 @@
 import hashlib
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tempfile
@@ -160,6 +161,20 @@ done
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("env create", self.calls.read_text())
         self.assertFalse(self.prefix.exists())
+        pip_call = next(line for line in self.calls.read_text().splitlines()
+                        if "python -m pip install" in line)
+        self.assertIn("--only-binary=:all:", pip_call)
+        self.assertIn("releases/download/v2.0.0rc6/nautilus_trader-2.0.0rc6-", pip_call)
+        self.assertIn("#sha256=9b4002a7bf5e6399c51073039b740ccf3ca7a1e2584ff72c7d479f03eaa9658d", pip_call)
+
+    def test_release_pin_matches_benchmark_and_snapshot(self):
+        version = re.search(r"^NAUTILUS_VERSION=(\S+)$", SETUP, re.MULTILINE).group(1)
+        benchmark = (PROJECT / "scripts/benchmark.py").read_text()
+        expected = re.search(r'^EXPECTED_NAUTILUS_VERSION = "([^"]+)"$',
+                             benchmark, re.MULTILINE).group(1)
+        snapshot = (PROJECT / "requirements/pip-freeze.txt").read_text().splitlines()
+        self.assertEqual(version, expected)
+        self.assertIn(f"nautilus-trader=={version}", snapshot)
 
 
 if __name__ == "__main__":

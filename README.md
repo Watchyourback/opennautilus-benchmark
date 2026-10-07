@@ -4,6 +4,8 @@
 
 第一阶段环境准备已完成；第二阶段已于 2026-08-13 首次执行统一 Python benchmark。
 
+2026-10-07 将环境统一升级到固定 release `2.0.0rc6`（候选发布版），报告的 `benchmark_version` 提升为 `3`。此前版本 `2` 使用 `2.0.0rc3.dev20260811` nightly；历史报告保留，各服务器需重新准备环境并重跑，新旧版本结果应分别比较。
+
 本项目用于在多台服务器上，以完全一致的 NautilusTrader 官方 canonical workload 比较 CPU / 服务器的单回测性能和整机并行回测吞吐。
 
 ## 固定环境
@@ -11,17 +13,17 @@
 | 项目 | 固定值 |
 | --- | --- |
 | Python | `3.12.13` |
-| NautilusTrader | `2.0.0rc3.dev20260811` |
-| 分支类型 | 官方 nightly（不是同日的 develop `+run` 构建） |
-| 官方 nightly commit | `34014ab94b96d3b227ec793e76999e259ca32e52` |
-| 安装来源 | `https://packages.nautechsystems.io/simple` |
-| Linux x86_64 wheel | `nautilus_trader-2.0.0rc3.dev20260811-cp312-cp312-manylinux_2_34_x86_64.whl` |
-| Wheel SHA256（官方 index） | `95c9a12943a4fdb76d54f1d73e48b570372d60172cc5f5c6b0e6306dbb50428d` |
+| NautilusTrader | `2.0.0rc6` |
+| 发布标签 | 官方 release `v2.0.0rc6`（候选发布版） |
+| Release commit | `7b766f8825b2539c5b2ac1375e9d97b41c509edb` |
+| 安装来源 | [官方 GitHub release](https://github.com/nautechsystems/nautilus_trader/releases/tag/v2.0.0rc6)；依赖 index 为 `https://packages.nautechsystems.io/simple` |
+| Linux x86_64 wheel | `nautilus_trader-2.0.0rc6-cp312-cp312-manylinux_2_34_x86_64.whl` |
+| Wheel SHA256（官方 release / index） | `9b4002a7bf5e6399c51073039b740ccf3ca7a1e2584ff72c7d479f03eaa9658d` |
 | Wheel 策略 | `--only-binary=:all:`；不允许源码构建 |
 | Conda environment | `nautilus-benchmark` |
 | Conda prefix | 由本机 Conda 管理，不依赖固定绝对路径 |
 
-官方 nightly 文档支持 Python 3.12–3.14；这里选择 Python 3.12 作为各服务器的统一版本。使用 Miniforge 具名环境，不使用 base 或系统 Python：
+官方 rc6 支持 Python 3.12–3.14；这里选择 Python 3.12 作为各服务器的统一版本。使用 Miniforge 具名环境，不使用 base 或系统 Python：
 
 ```bash
 conda activate nautilus-benchmark
@@ -33,7 +35,7 @@ conda activate nautilus-benchmark
 | --- | --- |
 | 本地文件 | `data/btc-perp-20211231-20220201_1m.csv` |
 | 官方仓库位置 | `test_data/btc-perp-20211231-20220201_1m.csv` |
-| 来源 commit | `34014ab94b96d3b227ec793e76999e259ca32e52` |
+| 来源 commit | `7b766f8825b2539c5b2ac1375e9d97b41c509edb` |
 | 文件大小 | `3,220,342 bytes` |
 | 文件行数 | `45,032`（含 1 行 header） |
 | SHA256 | `65ab55cd5f3531aa64f429772a38331fe82a92973cbb32a79b243073236c8da3` |
@@ -42,14 +44,14 @@ CSV 是官方仓库原始文件，未修改。canonical workload 只读取 heade
 
 ## 官方 canonical benchmark 定义
 
-固定 nightly commit 中的源码位置：
+固定 rc6 release commit 中的源码位置：
 
 - 注册入口：`crates/backtest/benches/engine.rs`
 - workload 定义：`crates/backtest/benches/engine/canonical.rs`
 - 官方说明与基线：`crates/backtest/benches/BENCHMARKS.md`
 - 本地官方说明副本：`references/official/crates/backtest/benches/BENCHMARKS.md`
-  - 来源 commit：`34014ab94b96d3b227ec793e76999e259ca32e52`
-  - SHA256：`173ce39b52bc76e9cdb28099bfd8c0a39e012cd8cffae158f00c255793f71f12`
+  - 来源 commit：`7b766f8825b2539c5b2ac1375e9d97b41c509edb`
+  - SHA256：`08d164bf11620c07a69f6c3f172924161f120ed45d2562a5c154da0f90588344`
 
 当前官方定义（2026-08-10 引入的 canonical 四场景矩阵）与旧的单一案例相比，明确统一为每场景：
 
@@ -57,6 +59,7 @@ CSV 是官方仓库原始文件，未修改。canonical workload 只读取 heade
 - Quote 数量 `10,000`，Bar 数量 `10,000`，data events 总数 `20,000`。
 - Instrument：`BTCUSDT-PERP.BINANCE`，raw symbol `BTCUSDT`，base currency `BTC`。
 - Venue：`BINANCE`；Netting OMS、Margin account、L1 MBP book、初始余额 `1,000,000 USDT`、queue position enabled。
+- Venue fee model：`MakerTakerFeeModel`，maker rate=`0.0002`、taker rate=`0.0004`；rc6 将费率从 instrument 迁到 venue。
 - Bar type：`BTCUSDT-PERP.BINANCE-1-MINUTE-LAST-EXTERNAL`。
 - bypass logging、analysis disabled、一个 simulated venue；四场景使用完全相同的数据流。
 
@@ -67,15 +70,15 @@ CSV 是官方仓库原始文件，未修改。canonical workload 只读取 heade
 | Passive limit orders | 同样 64 个时间点交替 Buy/Sell，每笔 `0.010`；Buy price `30,000.00`，Sell price `70,000.00`；停止时全部撤销 | 64 submitted / 0 fills / 64 canceled；192 execution events |
 | Bar EMA cross | 对 bar close 计算 EMA fast=`10`、slow=`20`；状态发生上穿时 Buy、下穿时 Sell market order，每笔 `0.010` | 450 submitted / 450 fills / 225 positions；900 execution events |
 
-所有场景的固定事件数、订单结果和参数都应在第二阶段的 Python 实现中保持一致。官方 Rust benchmark 的 `run_preloaded` 与 `load_build_run` 是两种计时边界；第二阶段需先明确 Python benchmark 采用哪一个边界，再跨服务器统一执行。
+Python benchmark 保持这四个场景的固定事件数、订单结果和参数。rc6 的 Rust benchmark 另有 typed 输入变体；本项目继续使用交错 QuoteTick / Bar 的 legacy 输入。Python 的 `run_only` 对应官方 `run_preloaded` 的运行计时范围，`load_build_run` 包括加载、构建及运行；两种范围均跨服务器统一执行。
 
 ## 环境锁定文件
 
-- `requirements/pip-freeze.txt`：当前环境的原始 `pip freeze` 输出。
+- `requirements/pip-freeze.txt`：固定环境的 Python 包版本快照。
 - `requirements/conda-explicit.txt`：Linux x86_64 的完整 Conda 显式包列表。
-- `requirements/environment.yml`：便于在其他服务器创建同版本环境，并从官方 index 安装固定 wheel。
+- `requirements/environment.yml`：创建同版本 Conda 环境；固定 NautilusTrader wheel 由 setup 安装。
 
-同架构 Linux 服务器优先使用 `conda-explicit.txt` 重建 Conda 层，再安装固定 NautilusTrader wheel；跨架构服务器使用 `environment.yml`，但必须保持 Python、NautilusTrader、数据和 benchmark 参数一致。
+新服务器使用 `setup.sh` 创建 Conda 层并安装固定 NautilusTrader wheel。`conda-explicit.txt` 保留 Linux x86_64 Conda 层的完整包列表，用于精确重建；当前 setup 仅支持 Linux x86_64。
 
 ## 新服务器：一键准备（不执行 benchmark）
 
@@ -87,9 +90,9 @@ bash scripts/setup.sh
 
 setup 优先复用 PATH 或常见安装目录中的 Conda（包括 `~/miniforge3`、`~/miniconda3`）。未检测到时，自动从官方 GitHub release 下载固定的 Miniforge `26.7.2-0`，核验脚本内锁定的 SHA256，再无交互安装到 `~/miniforge3`。下载需要 `curl` 或 `wget`，并能访问 GitHub、conda-forge 和 NautilusTrader 官方 index。安装包暂存在项目 `tmp/`，成功或失败后自动清理；不会覆盖已有但不可用的安装目录。脚本不修改 shell 配置，结束时会打印当前终端所需的 `source .../etc/profile.d/conda.sh` 与 `conda activate` 命令。
 
-`data/`、`logs/`、空的 `results/` 目录和固定官方 CSV 都是项目基准内容，必须随项目完整复制。历史 benchmark JSON 不纳入仓库；新结果仅保存在本地 `results/`。setup 检查 Linux x86_64 与 glibc 2.34+，准备 Conda，创建或核验具名环境 `nautilus-benchmark`，然后通过 `pip --only-binary` 从官方 index 安装锁定的 NautilusTrader wheel，并校验 Python、NautilusTrader 与 CSV SHA256。项目依赖只安装在具名环境中。缺少项目文件或数据时直接停止；它不补建基准目录、不下载数据，也**不会**调用 `benchmark.py` 或执行任何 backtest。
+`data/`、`logs/`、空的 `results/` 目录和固定官方 CSV 都是项目基准内容，必须随项目完整复制。历史 benchmark JSON 不纳入仓库；新结果仅保存在本地 `results/`。setup 检查 Linux x86_64 与 glibc 2.34+，准备 Conda，创建或核验具名环境 `nautilus-benchmark`，然后通过 `pip --only-binary` 从官方 GitHub release 安装固定的 rc6 wheel。wheel URL 包含锁定的 SHA256，pip 下载时会强制校验；脚本再校验 Python、NautilusTrader 与 CSV SHA256。项目依赖只安装在具名环境中。缺少项目文件或数据时直接停止；它不补建基准目录、不下载数据，也**不会**调用 `benchmark.py` 或执行任何 backtest。
 
-若目标服务器已存在同名环境，脚本只校验其版本；不匹配时会停止，避免覆盖未知环境。确认可以替换后再手动执行 `conda env remove -n nautilus-benchmark` 并重新运行 setup。
+若目标服务器已存在同名环境，脚本先核验 Python `3.12.13`，通过后会将 NautilusTrader 安装或升级到固定 `2.0.0rc6`，无需删除旧环境；此前安装失败、尚未装上 NautilusTrader 的环境也可直接重跑 setup。Python 版本不匹配时停止；确认可以替换后再手动执行 `conda env remove -n nautilus-benchmark` 并重新运行 setup。
 
 自动安装流程的离线回归检查：`python3 -m unittest discover -s tests -v`，覆盖首次安装、已有环境复用、下载或安装失败、校验失败和安装目录保护。
 

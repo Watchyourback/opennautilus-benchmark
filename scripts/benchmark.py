@@ -19,6 +19,7 @@ from typing import Any
 import nautilus_trader
 from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
 from nautilus_trader.common import LoggerConfig
+from nautilus_trader.execution import MakerTakerFeeModel
 from nautilus_trader.indicators import ExponentialMovingAverage
 from nautilus_trader.model import (
     AccountType,
@@ -51,9 +52,9 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 DATA_PATH = PROJECT_DIR / "data" / "btc-perp-20211231-20220201_1m.csv"
 RESULTS_DIR = PROJECT_DIR / "results"
 
-EXPECTED_NAUTILUS_VERSION = "2.0.0rc3.dev20260811"
+EXPECTED_NAUTILUS_VERSION = "2.0.0rc6"
 EXPECTED_DATA_SHA256 = "65ab55cd5f3531aa64f429772a38331fe82a92973cbb32a79b243073236c8da3"
-SOURCE_COMMIT = "34014ab94b96d3b227ec793e76999e259ca32e52"
+SOURCE_COMMIT = "7b766f8825b2539c5b2ac1375e9d97b41c509edb"
 DATA_ROWS = 10_000
 DATA_EVENTS = DATA_ROWS * 2
 SCHEDULED_ACTIONS = 64
@@ -61,7 +62,7 @@ TRADE_SIZE = "0.010"
 EMA_FAST_PERIOD = 10
 EMA_SLOW_PERIOD = 20
 # Cross-server measurement contract. Change only by creating a new benchmark version.
-BENCHMARK_VERSION = 2
+BENCHMARK_VERSION = 3
 WARMUP_SECONDS_PER_SCENARIO = 2.0
 SAMPLES = 9
 BATCH_SIZE = 5
@@ -102,8 +103,6 @@ def canonical_instrument() -> CryptoPerpetual:
         min_price=Price.from_str("1.00"),
         margin_init=Decimal("1.0"),
         margin_maint=Decimal("0.35"),
-        maker_fee=Decimal("0.0002"),
-        taker_fee=Decimal("0.0004"),
     )
 def timestamp_ns(value: str) -> int:
     parsed = datetime.fromisoformat(value).replace(tzinfo=UTC)
@@ -214,6 +213,7 @@ def build_engine(scenario: str, fixture: Fixture) -> BacktestEngine:
         starting_balances=[Money.from_str("1000000 USDT")],
         book_type=BookType.L1_MBP,
         queue_position=True,
+        fee_model=MakerTakerFeeModel(Decimal("0.0002"), Decimal("0.0004")),
     )
     engine.add_instrument(fixture.instrument)
     if scenario == "scheduled_market_orders":
