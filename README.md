@@ -79,15 +79,19 @@ CSV 是官方仓库原始文件，未修改。canonical workload 只读取 heade
 
 ## 新服务器：一键准备（不执行 benchmark）
 
-将整个 `nautilus-benchmark/` 目录复制到新服务器的 workspace。需要已安装 Miniforge/Conda，且服务器为 Linux x86_64、glibc 2.34+。从项目根目录执行：
+将整个 `nautilus-benchmark/` 目录复制到新服务器的 workspace。服务器需要为 Linux x86_64、glibc 2.34+；无需预先安装 Miniforge/Conda。从项目根目录执行：
 
 ```bash
 bash scripts/setup.sh
 ```
 
-`data/`、`logs/`、空的 `results/` 目录和固定官方 CSV 都是项目基准内容，必须随项目完整复制。历史 benchmark JSON 不纳入仓库；新结果仅保存在本地 `results/`。setup 只检查 Linux x86_64 与 glibc 2.34+，创建或核验具名环境 `nautilus-benchmark`，然后通过 `pip --only-binary` 从官方 index 安装锁定的 NautilusTrader wheel，并校验 Python、NautilusTrader 与 CSV SHA256。缺少项目文件或数据时直接停止；它不创建目录、不下载数据，也**不会**调用 `benchmark.py` 或执行任何 backtest。
+setup 优先复用 PATH 或常见安装目录中的 Conda（包括 `~/miniforge3`、`~/miniconda3`）。未检测到时，自动从官方 GitHub release 下载固定的 Miniforge `26.7.2-0`，核验脚本内锁定的 SHA256，再无交互安装到 `~/miniforge3`。下载需要 `curl` 或 `wget`，并能访问 GitHub、conda-forge 和 NautilusTrader 官方 index。安装包暂存在项目 `tmp/`，成功或失败后自动清理；不会覆盖已有但不可用的安装目录。脚本不修改 shell 配置，结束时会打印当前终端所需的 `source .../etc/profile.d/conda.sh` 与 `conda activate` 命令。
+
+`data/`、`logs/`、空的 `results/` 目录和固定官方 CSV 都是项目基准内容，必须随项目完整复制。历史 benchmark JSON 不纳入仓库；新结果仅保存在本地 `results/`。setup 检查 Linux x86_64 与 glibc 2.34+，准备 Conda，创建或核验具名环境 `nautilus-benchmark`，然后通过 `pip --only-binary` 从官方 index 安装锁定的 NautilusTrader wheel，并校验 Python、NautilusTrader 与 CSV SHA256。项目依赖只安装在具名环境中。缺少项目文件或数据时直接停止；它不补建基准目录、不下载数据，也**不会**调用 `benchmark.py` 或执行任何 backtest。
 
 若目标服务器已存在同名环境，脚本只校验其版本；不匹配时会停止，避免覆盖未知环境。确认可以替换后再手动执行 `conda env remove -n nautilus-benchmark` 并重新运行 setup。
+
+自动安装流程的离线回归检查：`python3 -m unittest discover -s tests -v`，覆盖首次安装、已有环境复用、下载或安装失败、校验失败和安装目录保护。
 
 ## 运行 benchmark
 
