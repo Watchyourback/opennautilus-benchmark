@@ -154,9 +154,15 @@ class PriceTests(unittest.TestCase):
         saved = json.loads(self.record.read_text())
         self.assertEqual(saved["input"]["currency"], "EUR")
         self.assertNotIn("EUR", json.dumps({k: v for k, v in saved.items() if k != "input"}))
-        again, _, prompts = self.resolve(answers=[])
+        again, _, prompts = self.resolve(answers=[""])
         self.assertAlmostEqual(again, price)
-        self.assertEqual(prompts, [])
+        self.assertEqual(len(prompts), 1)
+        self.assertIn("60", prompts[0])
+        self.assertIn("EUR/年", prompts[0])
+        self.assertIn("重新输入", prompts[0])
+        silent, _, silent_prompts = self.resolve()
+        self.assertAlmostEqual(silent, price)
+        self.assertEqual(silent_prompts, [])
 
     def test_interactive_defaults_are_monthly_usd(self):
         price, _, _ = self.resolve(answers=["", "", "4.2"])
@@ -178,6 +184,32 @@ class PriceTests(unittest.TestCase):
         price, _, prompts = self.resolve(answers=["y", "JPY", "10000", "50.4"])
         self.assertAlmostEqual(price, 4.2)
         self.assertIn("USD", prompts[-1])
+
+    def test_stale_monthly_is_recomputed_from_yearly_input(self):
+        self.record.write_text(json.dumps({
+            "fingerprint": score.machine_fingerprint(),
+            "monthly_price_usd": 0.45,
+            "input": {"amount": 50.4, "currency": "USD", "period": "y", "rate": 1.0, "rate_date": "-"},
+        }))
+        price, _, prompts = self.resolve(answers=[""])
+        self.assertAlmostEqual(price, 4.2)
+        self.assertEqual(len(prompts), 1)
+        self.assertIn("50.4 USD/年", prompts[0])
+        self.assertIn("4.2 美元/月", prompts[0])
+
+    def test_confirm_yes_replaces_saved_price(self):
+        self.resolve(answers=["m", "USD", "4.2"])
+        price, _, prompts = self.resolve(answers=["y", "y", "USD", "50.4"])
+        self.assertAlmostEqual(price, 4.2)
+        self.assertIn("重新输入", prompts[0])
+        saved = json.loads(self.record.read_text())
+        self.assertEqual(saved["input"]["amount"], 50.4)
+        self.assertEqual(saved["input"]["period"], "y")
+
+    def test_reentry_blank_amount_keeps_saved_price(self):
+        self.resolve(answers=["m", "USD", "4.2"])
+        price, _, _ = self.resolve(answers=["y", "m", "USD", ""])
+        self.assertEqual(price, 4.2)
 
     def test_other_machine_record_is_ignored(self):
         self.record.write_text(json.dumps({"fingerprint": "someone-else", "monthly_price_usd": 99.0}))

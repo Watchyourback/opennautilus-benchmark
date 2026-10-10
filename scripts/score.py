@@ -218,12 +218,27 @@ def machine_fingerprint() -> str:
     return hashlib.sha256((raw or platform.node()).encode()).hexdigest()
 
 
+def monthly_from_source(source: Mapping[str, Any]) -> float:
+    """用当时保存的金额、周期和汇率重算美元/月，避免月费字段和输入不一致。"""
+    amount = float(source["amount"])
+    rate = float(source.get("rate", 1.0))
+    if amount <= 0 or rate <= 0 or not math.isfinite(amount) or not math.isfinite(rate):
+        raise ScoreError("价格记录无效")
+    return amount * rate / (12 if source.get("period") == "y" else 1)
+
+
 def _read_record(path: Path) -> dict[str, Any] | None:
     try:
         record = json.loads(path.read_text())
-        if record["fingerprint"] == machine_fingerprint() and float(record["monthly_price_usd"]) > 0:
-            return record
-    except (OSError, ValueError, KeyError, TypeError):
+        if record["fingerprint"] != machine_fingerprint():
+            return None
+        source = record.get("input")
+        monthly = monthly_from_source(source) if isinstance(source, dict) and "amount" in source else float(record["monthly_price_usd"])
+        if monthly <= 0 or not math.isfinite(monthly):
+            return None
+        record["monthly_price_usd"] = monthly
+        return record
+    except (OSError, ValueError, KeyError, TypeError, ScoreError):
         pass
     return None
 
@@ -233,10 +248,43 @@ def _write_record(path: Path, monthly: float, source: dict[str, Any]) -> None:
     path.write_text(json.dumps(record, indent=2) + "\n")
 
 
+def describe_price(record: Mapping[str, Any]) -> str:
+    """给人看的当前价格。有原始输入时带上币种和月/年，并给出折合的美元/月。"""
+    monthly = float(record["monthly_price_usd"])
+    source = record.get("input")
+    if not isinstance(source, dict) or "amount" not in source:
+        return f"{monthly:.4g} 美元/月"
+    period = "年" if source.get("period") == "y" else "月"
+    currency = str(source.get("currency") or "USD")
+    text = f"{float(source['amount']):.4g} {currency}/{period}"
+    if currency != "USD" or source.get("period") == "y":
+        text += f"（折合 {monthly:.4g} 美元/月）"
+    return text
+
+
+def _confirm_reuse(record: Mapping[str, Any], ask: Callable[[str], str]) -> bool:
+    """展示当前价格。回车沿用，y 重新输入。返回是否沿用。"""
+    prompt = f"当前价格：{describe_price(record)}。重新输入？[y/N]: "
+    while True:
+        try:
+            answer = ask(prompt).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return True
+        if answer in ("", "n", "no"):
+            return True
+        if answer in ("y", "yes"):
+            return False
+        print("请输入 y 或直接回车。")
+
+
 def _ask_price(
-    ask: Callable[[str], str], fetch_rate: Callable[[str], tuple[float, str]]
+    ask: Callable[[str], str], fetch_rate: Callable[[str], tuple[float, str]], *, replacing: bool = False
 ) -> tuple[float, dict[str, Any]] | None:
-    print("这台机器还没有价格记录，用于计算性价比（直接回车可跳过）。")
+    if replacing:
+        print("请输入新价格（金额直接回车则仍用当前价格）。")
+    else:
+        print("这台机器还没有价格记录，用于计算性价比（直接回车可跳过）。")
     while True:
         period = ask("计价方式 [m=月价 / y=年价]（默认 m）: ").strip().lower() or "m"
         if period in ("m", "y"):
@@ -292,16 +340,25 @@ def resolve_monthly_price(
             return None, f"({error})"
 
     record = _read_record(record_path)
-    if record:
+    replacing = False
+    if record and ask is not None:
+        if _confirm_reuse(record, ask):
+            return float(record["monthly_price_usd"]), ""
+        replacing = True
+    elif record:
         return float(record["monthly_price_usd"]), ""
-    if ask is None:
+    elif ask is None:
         return None, "(本机无价格记录；设置 BENCHMARK_MONTHLY_PRICE 或 BENCHMARK_YEARLY_PRICE 后重跑)"
     try:
-        answer = _ask_price(ask, fetch_rate)
+        answer = _ask_price(ask, fetch_rate, replacing=replacing)
     except (EOFError, KeyboardInterrupt):
         print()
+        if record:
+            return float(record["monthly_price_usd"]), ""
         return None, "(已跳过价格输入)"
     if answer is None:
+        if record:
+            return float(record["monthly_price_usd"]), ""
         return None, "(已跳过价格输入)"
     monthly, source = answer
     try:
