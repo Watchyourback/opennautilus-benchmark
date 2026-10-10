@@ -85,6 +85,20 @@ class ScoreTests(unittest.TestCase):
         self.assertIsNone(scores)
         self.assertIn("已跳过打分", text)
 
+    def test_report_json_leads_with_three_scores(self):
+        report = make_report()
+        report["scores"] = score.compute_scores(report, BASELINE, 4.0)
+        report["zebra"] = 1
+        report["alpha"] = 1
+        text = score.dumps_report(report)
+        head = text.split('"ratios"', 1)[0]
+        self.assertTrue(text.startswith('{\n  "scores": {\n    "single":'))
+        self.assertLess(head.index('"single"'), head.index('"multi"'))
+        self.assertLess(head.index('"multi"'), head.index('"value"'))
+        self.assertLess(text.index('"value"'), text.index('"alpha"'))
+        self.assertLess(text.index('"alpha"'), text.index('"zebra"'))
+        self.assertEqual(json.loads(text)["scores"]["single"], report["scores"]["single"])
+
     def test_format_mentions_missing_price(self):
         text = score.format_scores(score.compute_scores(make_report(), BASELINE), price_note="(缺价格)")
         self.assertIn("(缺价格)", text)

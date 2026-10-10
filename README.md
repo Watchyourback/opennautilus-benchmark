@@ -110,7 +110,7 @@ python scripts/benchmark.py
 
 ## 分数
 
-每次运行 `python scripts/benchmark.py` 结束时，终端会报告三个数（100 = 参考机，越高越好），同一份结果写入报告 JSON 的 `scores` 字段：
+每次运行 `python scripts/benchmark.py` 结束时，终端会报告三个数（100 = 参考机，越高越好）。报告 JSON 的第一项就是 `scores`，打开文件先看到这三个字段：`single`（单核）、`multi`（多核）、`value`（性价比）。
 
 | 名称 | 含义 |
 | --- | --- |

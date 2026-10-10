@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import json
 import os
 import platform
 import statistics
@@ -46,7 +45,7 @@ from nautilus_trader.model import (
 )
 from nautilus_trader.trading import Strategy, StrategyConfig
 
-from score import interactive_ask, resolve_monthly_price, score_report
+from score import dumps_report, interactive_ask, resolve_monthly_price, score_report
 from system_info import host_info, public_host_label, resource_delta, resource_snapshot
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -388,7 +387,7 @@ def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"benchmark-{host_label}-{started_utc.strftime('%Y%m%dT%H%M%SZ')}.json"
     output_path = RESULTS_DIR / filename
-    output_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    output_path.write_text(dumps_report(output), encoding="utf-8")
 
     print_report(
         single_results,

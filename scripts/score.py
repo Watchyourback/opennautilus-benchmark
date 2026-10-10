@@ -119,6 +119,28 @@ def compute_scores(
     }
 
 
+def dumps_report(report: Mapping[str, Any]) -> str:
+    """报告 JSON。文件开头是单核、多核、性价比，其余字段保持字母序。"""
+    rest = {key: report[key] for key in report if key != "scores"}
+    rest_text = json.dumps(rest, indent=2, sort_keys=True)
+    scores = report.get("scores")
+    if not scores:
+        return rest_text + "\n"
+    ordered = {
+        "single": scores["single"],
+        "multi": scores["multi"],
+        "value": scores["value"],
+        "ratios": {
+            phase: {scenario: scores["ratios"][phase][scenario] for scenario in sorted(scores["ratios"][phase])}
+            for phase in ("single", "multi")
+        },
+        "flags": list(scores["flags"]),
+    }
+    lines = json.dumps(ordered, indent=2).splitlines()
+    embedded = lines[0] + "\n" + "\n".join("  " + line for line in lines[1:])
+    return '{\n  "scores": ' + embedded + ",\n" + rest_text[2:] + "\n"
+
+
 def format_scores(scores: Mapping[str, Any], *, price_note: str = "") -> str:
     lines = ["分数（100 = 参考机）", f"  单核   {scores['single']:6.1f}", f"  多核   {scores['multi']:6.1f}"]
     if scores["value"] is not None:
