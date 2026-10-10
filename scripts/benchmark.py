@@ -45,7 +45,8 @@ from nautilus_trader.model import (
 )
 from nautilus_trader.trading import Strategy, StrategyConfig
 
-from score import dumps_report, interactive_ask, resolve_monthly_price, score_report
+from price import interactive_ask, resolve_monthly_price
+from score import dumps_report, score_report
 from system_info import host_info, public_host_label, resource_delta, resource_snapshot
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]

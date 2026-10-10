@@ -8,6 +8,7 @@ from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT / "scripts"))
+import price  # noqa: E402
 import score  # noqa: E402
 
 RATES = {"USD": (1.0, "-"), "EUR": (1.1, "2026-10-09"), "CNY": (0.15, "2026-10-09")}
@@ -122,10 +123,10 @@ class PriceTests(unittest.TestCase):
             except StopIteration:
                 raise EOFError from None
 
-        price, note = score.resolve_monthly_price(
+        monthly, note = price.resolve_monthly_price(
             env or {}, self.record, ask=ask if answers is not None else None, fetch_rate=rate
         )
-        return price, note, prompts
+        return monthly, note, prompts
 
     def test_env_monthly_and_yearly(self):
         self.assertEqual(self.resolve({"BENCHMARK_MONTHLY_PRICE": "4.2"})[0], 4.2)
@@ -148,9 +149,10 @@ class PriceTests(unittest.TestCase):
         self.assertFalse(self.record.exists())
 
     def test_interactive_yearly_euro_saved_and_reused(self):
-        price, note, prompts = self.resolve(answers=["y", "EUR", "60"])
+        price, note, prompts = self.resolve(answers=["y", "EUR", "60", ""])
         self.assertAlmostEqual(price, 60 * 1.1 / 12)
-        self.assertEqual(len(prompts), 3)
+        self.assertEqual(len(prompts), 4)
+        self.assertIn("将保存 60 EUR/年（折合 5.5 美元/月）", prompts[-1])
         saved = json.loads(self.record.read_text())
         self.assertEqual(saved["input"]["currency"], "EUR")
         self.assertNotIn("EUR", json.dumps({k: v for k, v in saved.items() if k != "input"}))
@@ -165,11 +167,11 @@ class PriceTests(unittest.TestCase):
         self.assertEqual(silent_prompts, [])
 
     def test_interactive_defaults_are_monthly_usd(self):
-        price, _, _ = self.resolve(answers=["", "", "4.2"])
+        price, _, _ = self.resolve(answers=["", "", "4.2", ""])
         self.assertEqual(price, 4.2)
 
     def test_rmb_alias_and_bad_input_retries(self):
-        price, _, _ = self.resolve(answers=["x", "m", "??", "RMB", "abc", "-3", "100"])
+        price, _, _ = self.resolve(answers=["x", "m", "??", "RMB", "abc", "-3", "100", ""])
         self.assertAlmostEqual(price, 15.0)
 
     def test_blank_amount_skips_without_saving(self):
@@ -181,25 +183,25 @@ class PriceTests(unittest.TestCase):
         self.assertIsNone(self.resolve(answers=[])[0])
 
     def test_rate_failure_falls_back_to_usd_amount(self):
-        price, _, prompts = self.resolve(answers=["y", "JPY", "10000", "50.4"])
+        price, _, prompts = self.resolve(answers=["y", "JPY", "10000", "50.4", ""])
         self.assertAlmostEqual(price, 4.2)
         self.assertIn("USD", prompts[-1])
 
     def test_stale_monthly_is_recomputed_from_yearly_input(self):
         self.record.write_text(json.dumps({
-            "fingerprint": score.machine_fingerprint(),
+            "fingerprint": price.machine_fingerprint(),
             "monthly_price_usd": 0.45,
             "input": {"amount": 50.4, "currency": "USD", "period": "y", "rate": 1.0, "rate_date": "-"},
         }))
-        price, _, prompts = self.resolve(answers=[""])
-        self.assertAlmostEqual(price, 4.2)
+        monthly, _, prompts = self.resolve(answers=[""])
+        self.assertAlmostEqual(monthly, 4.2)
         self.assertEqual(len(prompts), 1)
         self.assertIn("50.4 USD/年", prompts[0])
         self.assertIn("4.2 美元/月", prompts[0])
 
     def test_confirm_yes_replaces_saved_price(self):
-        self.resolve(answers=["m", "USD", "4.2"])
-        price, _, prompts = self.resolve(answers=["y", "y", "USD", "50.4"])
+        self.resolve(answers=["m", "USD", "4.2", ""])
+        price, _, prompts = self.resolve(answers=["y", "y", "USD", "50.4", ""])
         self.assertAlmostEqual(price, 4.2)
         self.assertIn("重新输入", prompts[0])
         saved = json.loads(self.record.read_text())
@@ -207,15 +209,38 @@ class PriceTests(unittest.TestCase):
         self.assertEqual(saved["input"]["period"], "y")
 
     def test_reentry_blank_amount_keeps_saved_price(self):
-        self.resolve(answers=["m", "USD", "4.2"])
+        self.resolve(answers=["m", "USD", "4.2", ""])
         price, _, _ = self.resolve(answers=["y", "m", "USD", ""])
         self.assertEqual(price, 4.2)
 
     def test_other_machine_record_is_ignored(self):
         self.record.write_text(json.dumps({"fingerprint": "someone-else", "monthly_price_usd": 99.0}))
-        price, _, prompts = self.resolve(answers=["m", "USD", "5"])
+        price, _, prompts = self.resolve(answers=["m", "USD", "5", ""])
         self.assertEqual(price, 5.0)
-        self.assertEqual(len(prompts), 3)
+        self.assertEqual(len(prompts), 4)
+
+    def test_yearly_usd_is_confirmed_from_entered_text_before_scoring(self):
+        price, _, prompts = self.resolve(answers=["y", "", "0.41", "n", "y", "", "40.41", ""])
+        self.assertAlmostEqual(price, 3.3675)
+        self.assertAlmostEqual(price, 40.41 / 12)
+        saved = json.loads(self.record.read_text())
+        self.assertEqual(saved["input"]["text"], "40.41")
+        self.assertEqual(saved["input"]["amount"], 40.41)
+        self.assertEqual(saved["input"]["period"], "y")
+        self.assertAlmostEqual(saved["monthly_price_usd"], 3.3675)
+        self.assertIn("将保存 0.41 USD/年（折合 0.0341666667 美元/月）。使用这个价格？[Y/n]: ", prompts)
+        self.assertIn("将保存 40.41 USD/年（折合 3.3675 美元/月）。使用这个价格？[Y/n]: ", prompts)
+        scores = score.compute_scores(make_report(), BASELINE, price)
+        self.assertAlmostEqual(scores["value"], scores["multi"] * BASELINE["ref_monthly_price"] / price)
+        again, _, again_prompts = self.resolve(answers=[""])
+        self.assertAlmostEqual(again, price)
+        self.assertIn("当前价格：40.41 USD/年（折合 3.3675 美元/月）", again_prompts[0])
+
+    def test_amount_display_keeps_entered_digits(self):
+        price, _, prompts = self.resolve(answers=["", "", "123456.5", ""])
+        self.assertEqual(price, 123456.5)
+        self.assertIn("将保存 123456.5 USD/月", prompts[-1])
+        self.assertNotIn("e+", prompts[-1])
 
     def test_corrupt_record_is_ignored(self):
         self.record.write_text("{not json")
@@ -231,16 +256,16 @@ class PriceTests(unittest.TestCase):
             seen.append(request)
             return io.BytesIO(b'{"date": "2026-10-09", "rates": {"USD": 1.5}}')
 
-        with mock.patch.object(score.urllib.request, "urlopen", fake_urlopen):
-            self.assertEqual(score.fetch_usd_rate("EUR"), (1.5, "2026-10-09"))
+        with mock.patch.object(price.urllib.request, "urlopen", fake_urlopen):
+            self.assertEqual(price.fetch_usd_rate("EUR"), (1.5, "2026-10-09"))
         self.assertIn("EUR", seen[0].full_url)
         self.assertNotIn("Python-urllib", seen[0].get_header("User-agent"))
 
     def test_currency_normalisation(self):
-        self.assertEqual(score.normalize_currency("rmb"), "CNY")
-        self.assertEqual(score.normalize_currency("€"), "EUR")
+        self.assertEqual(price.normalize_currency("rmb"), "CNY")
+        self.assertEqual(price.normalize_currency("€"), "EUR")
         with self.assertRaises(score.ScoreError):
-            score.normalize_currency("dollars")
+            price.normalize_currency("dollars")
 
 
 if __name__ == "__main__":

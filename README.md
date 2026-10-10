@@ -130,7 +130,7 @@ python scripts/benchmark.py
 
 1. 环境变量 `BENCHMARK_MONTHLY_PRICE` 或 `BENCHMARK_YEARLY_PRICE`（二选一），币种用 `BENCHMARK_PRICE_CURRENCY`（默认 `USD`，也可 `EUR`、`CNY`/`RMB` 等三字母代码）。
 2. 本机价格记录 `.benchmark-local.json`（已加入 `.gitignore`）。终端里每次运行都会先展示这条价格，回车沿用，输入 `y` 重新填写。没有终端时直接沿用记录。
-3. 以上都没有，且在终端中运行时，benchmark 开始测量前会询问：计价方式（月/年）、币种、金额；回车跳过则本次不出性价比。
+3. 以上都没有，且在终端中运行时，benchmark 开始测量前会询问：计价方式（月/年）、币种、金额。程序复述刚解析出的金额和折合美元/月，回车确认后才保存并开始测量；输入 `n` 则重新填写。金额直接回车则跳过，本次不出性价比。展示用你输入的数字，不按有效数字缩写。
 
 非美元价格会联网查询当日汇率（[Frankfurter](https://frankfurter.dev)，欧洲央行数据），年价除以 12 折月。取汇率失败时改为让你直接输入美元金额。没有终端（后台、cron）时不询问，只提示用环境变量。
 
