@@ -53,6 +53,8 @@ CSV 是官方仓库原始文件，未修改。canonical workload 只读取 heade
   - 来源 commit：`7b766f8825b2539c5b2ac1375e9d97b41c509edb`
   - SHA256：`08d164bf11620c07a69f6c3f172924161f120ed45d2562a5c154da0f90588344`
 
+官方 Threadripper 9980X 的测试数据、测量口径、本机参考对照及原始 JSON 存档见 [9980X 基准说明](references/official/THREADRIPPER_9980X.md)。
+
 当前官方定义（2026-08-10 引入的 canonical 四场景矩阵）与旧的单一案例相比，明确统一为每场景：
 
 - 输入 CSV 前 `10,000` 行；每行生成一个零 spread `QuoteTick`（bid/ask 均为 close）和一个 1-minute `Bar`。
