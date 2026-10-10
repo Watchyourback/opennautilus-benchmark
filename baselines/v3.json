@@ -1,0 +1,19 @@
+{
+  "benchmark_version": 3,
+  "source_commit": "7b766f8825b2539c5b2ac1375e9d97b41c509edb",
+  "ref_monthly_price": 4.2,
+  "events_per_second": {
+    "single": {
+      "replay_only": 634741.8351983465,
+      "scheduled_market_orders": 516634.3019386103,
+      "passive_limit_orders": 367903.1613539715,
+      "bar_ema_cross": 266371.1488315684
+    },
+    "multi": {
+      "replay_only": 2217672.666746392,
+      "scheduled_market_orders": 1840487.8448615249,
+      "passive_limit_orders": 1312184.6434847468,
+      "bar_ema_cross": 971235.9584107633
+    }
+  }
+}

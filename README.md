@@ -108,12 +108,41 @@ python scripts/benchmark.py
 
 脚本依次显示中文阶段：结果校验、预热、单核测试、全核测试、生成报告。终端会显示两组性能和各自资源统计，完整报告写入同一个 `results/benchmark-<host-label>-<UTC timestamp>.json`。
 
+## 分数
+
+每次运行 `python scripts/benchmark.py` 结束时，终端会报告三个数（100 = 参考机，越高越好），同一份结果写入报告 JSON 的 `scores` 字段：
+
+| 名称 | 含义 |
+| --- | --- |
+| 单核 | 四个场景的单核 `run_only` events/s，各自除以参考机同场景值，取几何平均 × 100 |
+| 多核 | 同样的算法，用全核 `run_only` events/s（已是整机总吞吐，不再乘核数） |
+| 性价比 | `多核 × 参考机月费 ÷ 本机月费` |
+
+只用这一次运行的结果：每个场景的值本身已是 9 个 sample 的中位数。四场景权重相等。分数只在同一 `benchmark_version` 与同一 `source_commit` 内可比；换版本需重做参考机。
+
+**参考机**是 `baselines/v3.json`：最早那台机器三次运行的各场景中位数，月费 4.2 美元（50.4 美元/年）。重做参考机：`python scripts/score.py --make-baseline results/a.json results/b.json ... --ref-price 月费美元`。
+
+**低置信提示**不改分数：CPU steal 超过 1%、单核占用低于 90%、某场景 sample 极差超过中位数的 20%。
+
+**价格与币种。** 性价比需要本机价格，统一折算为美元/月，来源按优先级：
+
+1. 环境变量 `BENCHMARK_MONTHLY_PRICE` 或 `BENCHMARK_YEARLY_PRICE`（二选一），币种用 `BENCHMARK_PRICE_CURRENCY`（默认 `USD`，也可 `EUR`、`CNY`/`RMB` 等三字母代码）。
+2. 本机价格记录 `.benchmark-local.json`（已加入 `.gitignore`）。
+3. 以上都没有，且在终端中运行时，benchmark 开始测量前会询问：计价方式（月/年）、币种、金额；回车跳过则本次不出性价比。
+
+非美元价格会联网查询当日汇率（[Frankfurter](https://frankfurter.dev)，欧洲央行数据），年价除以 12 折月。取汇率失败时改为让你直接输入美元金额。没有终端（后台、cron）时不询问，只提示用环境变量。
+
+价格记录绑定机器指纹（`/etc/machine-id` 的哈希）；把整个目录复制到另一台服务器后，指纹不同，会重新询问。克隆出来的虚拟机若 machine-id 相同，删除 `.benchmark-local.json` 即可重新输入。价格和指纹只存本机，**不写入报告 JSON**。
+
+缺参考机文件、`source_commit` 不一致、价格不合法等情况都不会让 benchmark 失败，只在终端提示跳过。已有报告也可单独打分：`python scripts/score.py results/benchmark-xxx.json`（价格同样按上面的顺序获得，或用 `--price 美元/月` 指定）。
+
 ## 目录
 
 ```text
 nautilus-benchmark/
 ├── data/         # 官方固定 CSV
-├── scripts/      # 一键 setup、benchmark 与资源记录入口
+├── scripts/      # 一键 setup、benchmark、打分与资源记录入口
+├── baselines/    # 打分用的参考机
 ├── results/      # 第二阶段本地输出（JSON 不纳入 Git）
 ├── logs/         # 当前服务器基本信息
 ├── requirements/ # 环境锁定文件

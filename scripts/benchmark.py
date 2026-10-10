@@ -46,6 +46,7 @@ from nautilus_trader.model import (
 )
 from nautilus_trader.trading import Strategy, StrategyConfig
 
+from score import interactive_ask, resolve_monthly_price, score_report
 from system_info import host_info, public_host_label, resource_delta, resource_snapshot
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -318,6 +319,8 @@ def summarize(samples: dict[str, dict[str, list[float]]]) -> dict[str, Any]:
 
 def main() -> None:
     host_label = public_host_label()
+    # 价格询问放在测量之前，之后可无人值守；价格只存本机，不写入公开报告。
+    monthly_price, price_note = resolve_monthly_price(ask=interactive_ask())
     print("[阶段 1/5] 正在校验环境、数据和回测结果...")
     fixture = preflight()
     print("[阶段 2/5] 正在预热四个回测场景...")
@@ -356,7 +359,7 @@ def main() -> None:
         include_rss=False,
     )
     finished_utc = datetime.now(UTC)
-    print("[阶段 5/5] 正在生成 JSON 报告...")
+    print("[阶段 5/5] 正在计算分数并生成 JSON 报告...")
     output = {
         "benchmark_version": BENCHMARK_VERSION,
         "started_utc": started_utc.isoformat(),
@@ -379,6 +382,9 @@ def main() -> None:
         "single_core_results": single_results,
         "all_core_results": all_core_results,
     }
+    scores, score_text = score_report(output, monthly_price, price_note)
+    if scores is not None:
+        output["scores"] = scores
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"benchmark-{host_label}-{started_utc.strftime('%Y%m%dT%H%M%SZ')}.json"
     output_path = RESULTS_DIR / filename
@@ -392,6 +398,7 @@ def main() -> None:
         SCENARIOS,
         SCOPES,
     )
+    print(f"\n{score_text}")
     print(f"\n报告：{output_path}")
 
 
