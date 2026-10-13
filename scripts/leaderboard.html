@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Benchmark 排行榜</title>
+<style>
+  :root { --line: #8884; --bar: #3b82f6; --muted: #888; }
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 1.5rem 16px; max-width: 1100px; margin-inline: auto; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p.note { color: var(--muted); margin: 0 0 1rem; }
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: .4rem .7rem; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  th { cursor: pointer; user-select: none; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.bar { min-width: 140px; }
+  .fill { display: inline-block; height: .7rem; background: var(--bar); border-radius: 2px; vertical-align: middle; }
+  .flag { color: #d97706; }
+</style>
+<h1>Benchmark 排行榜</h1>
+<p class="note" id="note"></p>
+<div class="wrap"><table>
+  <thead><tr id="head"></tr></thead>
+  <tbody id="body"></tbody>
+</table></div>
+<script type="application/json" id="data">__ENTRIES__</script>
+<script>
+  const all = JSON.parse(document.getElementById('data').textContent);
+  const version = Math.max(...all.map(e => e.version), 0);
+  const entries = all.filter(e => e.version === version);
+  const cols = [
+    ['label', '机器标签'], ['cpu', 'CPU'], ['cpus', '逻辑核', 1],
+    ['single', '单核', 1], ['multi', '多核', 1], ['when', '时间(UTC)'], ['flags', '低置信', 1],
+  ];
+  let key = 'multi', dir = -1;
+  const maxMulti = Math.max(...entries.map(e => e.multi), 1);
+  const cell = (tr, text, cls) => { const td = tr.insertCell(); td.textContent = text; if (cls) td.className = cls; return td; };
+  function render() {
+    const head = document.getElementById('head'), body = document.getElementById('body');
+    head.replaceChildren(); body.replaceChildren();
+    const th0 = document.createElement('th'); th0.textContent = '#'; head.append(th0);
+    for (const [k, name, num] of cols) {
+      const th = document.createElement('th');
+      th.textContent = name + (k === key ? (dir < 0 ? ' ▼' : ' ▲') : '');
+      if (num) th.className = 'num';
+      th.onclick = () => { dir = k === key ? -dir : -1; key = k; render(); };
+      head.append(th);
+      if (k === 'multi') { const b = document.createElement('th'); head.append(b); }
+    }
+    const sorted = [...entries].sort((a, b) => (a[key] > b[key] ? 1 : a[key] < b[key] ? -1 : 0) * dir);
+    sorted.forEach((e, i) => {
+      const tr = body.insertRow();
+      cell(tr, i + 1, 'num');
+      for (const [k, , num] of cols) {
+        const v = typeof e[k] === 'number' && !Number.isInteger(e[k]) ? e[k].toFixed(1) : e[k];
+        cell(tr, k === 'flags' && v === 0 ? '' : v, (num ? 'num ' : '') + (k === 'flags' ? 'flag' : ''));
+        if (k === 'multi') {
+          const fill = document.createElement('span');
+          fill.className = 'fill'; fill.style.width = (e.multi / maxMulti * 120) + 'px';
+          cell(tr, '', 'bar').append(fill);
+        }
+      }
+    });
+    document.getElementById('note').textContent =
+      `benchmark_version ${version} · ${entries.length} 条 · 100 = 参考机 · 点击表头排序`;
+  }
+  render();
+</script>
+</html>

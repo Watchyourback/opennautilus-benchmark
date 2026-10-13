@@ -138,6 +138,31 @@ python scripts/benchmark.py
 
 缺参考机文件、`source_commit` 不一致、价格不合法等情况都不会让 benchmark 失败，只在终端提示跳过。已有报告也可单独打分：`python scripts/score.py results/benchmark-xxx.json`（价格同样按上面的顺序获得，或用 `--price 美元/月` 指定）。
 
+## 排行榜（本地 HTML + 私人 Cloudflare Worker）
+
+```bash
+python scripts/leaderboard.py                          # 终端表格，按多核分降序
+python scripts/leaderboard.py --html tmp/leaderboard.html   # 本地 HTML 报表（点表头排序）
+python scripts/leaderboard.py --upload                 # 上传到自己的 Worker
+```
+
+读取 `results/benchmark-*.json`，用原始 events/s 与 `baselines/` 重新算分，只收录与参考机 `benchmark_version` / `source_commit` 一致的报告。入榜条目和上传内容只含机器标签、CPU 型号、逻辑核数、单核/多核分、时间、低置信项数；不含价格、指纹或原始报告，故不排性价比。HTML 写到 `tmp/`（已被 Git 忽略）。
+
+`worker/` 是私人排行榜（Cloudflare Worker + KV，无公网写入口）：页面模板与本地 HTML 共用 `scripts/leaderboard.html`，页面只对通过 Cloudflare Access 的访问者开放（Worker 校验 Access JWT，其余 404）；`--upload` 用本机已登录的 wrangler 把整份榜单覆盖写入 KV 键 `runs`（幂等）。
+
+部署（需自己的 Cloudflare 账号，默认 `*.workers.dev`，不需要域名）：
+
+```bash
+cd worker
+cp wrangler.toml.example wrangler.toml
+npx wrangler login
+npx wrangler kv namespace create RESULTS   # 把返回的 id 填进 wrangler.toml
+# 在 Zero Trust 建 Access 应用保护该 Worker 的域名，把团队域和 AUD 填进 wrangler.toml 的 [vars]
+npx wrangler deploy
+```
+
+`wrangler.toml` 含本账号的 KV id、Access 团队域和 AUD，已被 Git 忽略。部署地址不要写进公开文档。
+
 ## 目录
 
 ```text

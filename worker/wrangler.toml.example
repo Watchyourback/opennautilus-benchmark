@@ -1,0 +1,20 @@
+name = "nautilus-benchmark"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# 复制为本目录的 wrangler.toml 后再填写。wrangler.toml 含本账号标识，不入库。
+# id 来自：npx wrangler kv namespace create RESULTS
+[[kv_namespaces]]
+binding = "RESULTS"
+id = ""
+
+# 页面模板与本地 HTML 报表共用 scripts/leaderboard.html
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
+
+# Zero Trust 里保护该 Worker 的 Access 应用：团队域与 AUD
+[vars]
+ACCESS_TEAM = ""
+ACCESS_AUD = ""
